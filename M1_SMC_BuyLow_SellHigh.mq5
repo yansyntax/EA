@@ -1,10 +1,10 @@
 //+------------------------------------------------------------------+
-//|                                  M1_SMC_BuyLow_SellHigh.mq5      |
-//|                               Copyright 2026, Smart SMC Scalper  |
+//|                               M1_PureReverse_Zone_5Layer.mq5     |
+//|                               Copyright 2026, Pure Reverse Zone  |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026"
-#property version   "16.00"
+#property version   "20.00"
 
 #include <Trade\Trade.mqh>
 CTrade trade;
@@ -12,54 +12,44 @@ CTrade trade;
 // --- Input Parameters ---
 input group "--- Settings Layering ---"
 input double   InpLotSize            = 0.01;     // Lot per Entry
-input int      InpLayerCount         = 5;        // Eksekusi Instant 5 Layer
-input ulong    InpMagicNumber        = 334455;   // Magic Number EA
+input int      InpLayerCount         = 5;        // Eksekusi 5 Layer
+input ulong    InpMagicNumber        = 889900;   // Magic Number EA
 
 input group "--- Target Profit & Basket Loss (Dalam USC) ---"
-input double   InpTargetProfitUSC    = 0.50;     // Target Profit Gabungan 5 Layer (0.50 USC = @0.10 USC/layer)
-input double   InpBasketMaxLossUSC   = 12.0;     // HARD BASKET CUT LOSS TOTAL KESELURUHAN (-12 USC)
+input double   InpTargetProfitUSC    = 0.50;     // Target Profit Gabungan (+0.50 USC Total)
+input double   InpBasketMaxLossUSC   = 10.0;     // HARD BASKET CUT LOSS TOTAL (-10 USC Total)
 
-input group "--- SMC Zone Settings (M1) ---"
-input int      InpLookbackCandles    = 30;       // Range 30 Candle M1 untuk Mencari High & Low Zone
+input group "--- Zone Lookback Settings (M1) ---"
+input int      InpLookbackCandles    = 30;       // Range 30 Candle M1 untuk Zone
 
 datetime lastTradeTime = 0;
 
 //+------------------------------------------------------------------+
-//| Expert initialization function                                   |
-//+------------------------------------------------------------------+
 int OnInit()
   {
    trade.SetExpertMagicNumber(InpMagicNumber);
-   Print("EA SMC Buy Low & Sell High (M1) Berhasil Aktif!");
+   Print("EA Pure Reverse Zone (M1 5 Layer) Ready!");
    return(INIT_SUCCEEDED);
   }
 
-//+------------------------------------------------------------------+
-//| Expert deinitialization function                                 |
-//+------------------------------------------------------------------+
 void OnDeinit(const int reason) {}
 
-//+------------------------------------------------------------------+
-//| Expert tick function                                             |
-//+------------------------------------------------------------------+
 void OnTick()
   {
-   // 1. KELOLA TOTAL BASKET PROFIT (>= 0.50 USC) & BASKET CUT LOSS (-12 USC TOTAL)
+   // 1. KELOLA TOTAL BASKET PROFIT & BASKET CUT LOSS (-10 USC TOTAL)
    ManageBasketPL();
 
-   // 2. Jeda 3 detik antar eksekusi
+   // 2. Jeda 3 detik antar siklus
    if(TimeCurrent() - lastTradeTime < 3) return;
 
-   // 3. Eksekusi 5 Layer jika Posisi Kosong
+   // 3. Eksekusi Entry Pure Reverse jika Posisi Kosong
    if(CountPositions() == 0)
      {
-      ExecuteBuyLowSellHigh();
+      ExecutePureReverseEntry();
      }
   }
 
-//+------------------------------------------------------------------+
-//| MANAGEMENT TOTAL BASKET PROFIT & LOSS (-12 USC TOTAL)            |
-//+------------------------------------------------------------------+
+// --- MANAGEMENT TOTAL BASKET PROFIT & LOSS ---
 void ManageBasketPL()
   {
    if(CountPositions() == 0) return;
@@ -78,25 +68,22 @@ void ManageBasketPL()
         }
      }
 
-   // A. FAST PROFIT CUT ALL (Total >= 0.50 USC)
+   // Cut All Profit
    if(totalProfit >= InpTargetProfitUSC)
      {
       CloseAllPositions();
-      Print("BASKET PROFIT TERCAPAI: ", totalProfit, " USC -> CLOSE ALL!");
+      Print("PURE REVERSE PROFIT TERCAPAI: ", totalProfit, " USC -> CUT ALL!");
       lastTradeTime = TimeCurrent();
      }
-   // B. HARD BASKET CUT LOSS (Total <= -12.0 USC)
+   // Hard Cut Loss (-10 USC Total Keseluruhan)
    else if(totalProfit <= -InpBasketMaxLossUSC)
      {
       CloseAllPositions();
-      Print("TOTAL BASKET MINUS MEMBENGKAK (", totalProfit, " USC) -> FAST BASKET CUT ALL (-12 USC)!");
+      Print("PURE REVERSE MINUS MELEBIHI -10 USC (", totalProfit, " USC) -> FAST CUT ALL!");
       lastTradeTime = TimeCurrent();
      }
   }
 
-//+------------------------------------------------------------------+
-//| FUNGSI SAPU BERSIH / CLOSE ALL POSISI                            |
-//+------------------------------------------------------------------+
 void CloseAllPositions()
   {
    for(int i = PositionsTotal() - 1; i >= 0; i--)
@@ -112,10 +99,8 @@ void CloseAllPositions()
      }
   }
 
-//+------------------------------------------------------------------+
-//| LOGIKA AKURAT: BUY HANYA DI BAWAH, SELL HANYA DI ATAS            |
-//+------------------------------------------------------------------+
-void ExecuteBuyLowSellHigh()
+// --- LOGIKA PURE REVERSE BERDASARKAN ZONA ---
+void ExecutePureReverseEntry()
   {
    MqlRates rates[];
    ArraySetAsSeries(rates, true);
@@ -124,9 +109,8 @@ void ExecuteBuyLowSellHigh()
 
    double ask   = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double bid   = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
 
-   // 1. CARI HARGA TERTINGGI (SUPPLY/PUCUK) & TERENDAH (DEMAND/DASAR) 30 CANDLE TERAKHIR
+   // Cari High Teratas & Low Terendah 30 Candle M1
    double highestHigh = rates[1].high;
    double lowestLow   = rates[1].low;
 
@@ -139,45 +123,33 @@ void ExecuteBuyLowSellHigh()
    double rangeZone = highestHigh - lowestLow;
    if(rangeZone <= 0) return;
 
-   // Hitung Posisi Harga Saat Ini dalam Persentase Range (0% = Paling Dasar, 100% = Paling Pucuk)
+   // Level Posisi Harga (0% = Dasar Terbawah, 100% = Pucuk Tertinggi)
    double currentPriceLevel = (bid - lowestLow) / rangeZone;
 
-   // Deteksi Konfirmasi Candle M1 Terakhir
-   bool isCandleBull = rates[0].close > rates[0].open;
-   bool isCandleBear = rates[0].close < rates[0].open;
+   // --- DIBALIK TOTAL TANPA FILTER CANDLE ---
 
-   // --- ATURAN FINAL SMC ---
-
-   // LOGIKA BUY: Hanya jika harga berada di AREA BAWAH/DASAR (< 35% dari Range) DAN Candle Mulai Memantul Hijau
-   if(currentPriceLevel <= 0.35 && isCandleBull)
+   // Dulu: Di Area Pucuk (>65%) disuruh SELL. Sekarang DIBALIK 100% JADI BUY 5 LAYER!
+   if(currentPriceLevel >= 0.65)
      {
-      Print("Harga di Area DISCOUNT/DASAR (Level: ", currentPriceLevel * 100, "%) & Memantul Naik -> TEMBAK 5 BUY!");
+      Print("Harga di Area Pucuk (", currentPriceLevel * 100, "%) -> PURE REVERSE: TEMBAK 5 BUY!");
       for(int k = 0; k < InpLayerCount; k++)
         {
-         trade.Buy(InpLotSize, _Symbol, ask, 0, 0, "SMC Buy Low");
+         trade.Buy(InpLotSize, _Symbol, ask, 0, 0, "Pure Reverse Buy");
         }
       lastTradeTime = TimeCurrent();
      }
-   // LOGIKA SELL: Hanya jika harga berada di AREA ATAS/PUCUK (> 65% dari Range) DAN Candle Mulai Memantul Merah
-   else if(currentPriceLevel >= 0.65 && isCandleBear)
+   // Dulu: Di Area Dasar (<35%) disuruh BUY. Sekarang DIBALIK 100% JADI SELL 5 LAYER!
+   else if(currentPriceLevel <= 0.35)
      {
-      Print("Harga di Area PREMIUM/PUCUK (Level: ", currentPriceLevel * 100, "%) & Memantul Turun -> TEMBAK 5 SELL!");
+      Print("Harga di Area Dasar (", currentPriceLevel * 100, "%) -> PURE REVERSE: TEMBAK 5 SELL!");
       for(int k = 0; k < InpLayerCount; k++)
         {
-         trade.Sell(InpLotSize, _Symbol, bid, 0, 0, "SMC Sell High");
+         trade.Sell(InpLotSize, _Symbol, bid, 0, 0, "Pure Reverse Sell");
         }
       lastTradeTime = TimeCurrent();
-     }
-   else
-     {
-      // Harga di tengah-tengah (Area Bahaya/Terapung) -> BATALKAN ENTRY
-      Print("Harga Berada di Tengah Range (Level: ", currentPriceLevel * 100, "%) -> TAHAN ENTRY (Mencegah Trap)");
      }
   }
 
-//+------------------------------------------------------------------+
-//| HELPER FUNCTION                                                  |
-//+------------------------------------------------------------------+
 int CountPositions()
   {
    int count = 0;
@@ -191,4 +163,3 @@ int CountPositions()
      }
    return count;
   }
-//+------------------------------------------------------------------+
