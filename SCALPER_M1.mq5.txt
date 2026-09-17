@@ -1,0 +1,70 @@
+;
+   adxHandle = iADX(tradeSymbol, PERIOD_M1, InpADXPeriod);
+   m5FastEmaHandle = iMA(tradeSymbol, PERIOD_M5, InpM5FastEMAPeriod, 0, MODE_EMA, PRICE_CLOSE);
+   m5SlowEmaHandle = iMA(tradeSymbol, PERIOD_M5, InpM5SlowEMAPeriod, 0, MODE_EMA, PRICE_CLOSE);
+
+   if(fastEmaHandle == INVALID_HANDLE || slowEmaHandle == INVALID_HANDLE ||
+      trendEmaHandle == INVALID_HANDLE || rsiHandle == INVALID_HANDLE ||
+      adxHandle == INVALID_HANDLE || m5FastEmaHandle == INVALID_HANDLE ||
+      m5SlowEmaHandle == INVALID_HANDLE)
+   {
+      Print("AUTOWIN90 failed to create indicator handles.");
+      return INIT_FAILED;
+   }
+
+   trade.SetExpertMagicNumber((ulong)InpMagicNumber);
+   trade.SetDeviationInPoints(InpDeviationPoints);
+   trade.SetTypeFillingBySymbol(tradeSymbol);
+   PrintFormat("AUTOWIN90 ready: %s M1, account=%s, spread limit=%d points",
+               tradeSymbol, AccountInfoString(ACCOUNT_CURRENCY), InpMaxSpreadPoints);
+   return INIT_SUCCEEDED;
+}
+
+void OnDeinit(const int reason)
+{
+   if(fastEmaHandle != INVALID_HANDLE) IndicatorRelease(fastEmaHandle);
+   if(slowEmaHandle != INVALID_HANDLE) IndicatorRelease(slowEmaHandle);
+   if(trendEmaHandle != INVALID_HANDLE) IndicatorRelease(trendEmaHandle);
+   if(rsiHandle != INVALID_HANDLE) IndicatorRelease(rsiHandle);
+   if(adxHandle != INVALID_HANDLE) IndicatorRelease(adxHandle);
+   if(m5FastEmaHandle != INVALID_HANDLE) IndicatorRelease(m5FastEmaHandle);
+   if(m5SlowEmaHandle != INVALID_HANDLE) IndicatorRelease(m5SlowEmaHandle);
+}
+
+void OnTick()
+{
+   if(tradeSymbol == "")
+      return;
+
+   ManageOpenPositions();
+
+   double todayResult = 0.0;
+   if(DailyLimitReached(todayResult))
+   {
+      if(InpCloseAtDailyLimit && ManagedPositionCount() > 0)
+         CloseManagedPositions("daily limit");
+      Comment("AUTOWIN90% halted for today\n",
+              "Today net: ", DoubleToString(todayResult, 2), " ",
+              AccountInfoString(ACCOUNT_CURRENCY));
+      return;
+   }
+
+   const int managedCount = ManagedPositionCount();
+   if(managedCount > 0)
+   {
+      Comment("AUTOWIN90% running\n",
+              "Layers: ", IntegerToString(managedCount), "/5\n",
+              "Basket: ", DoubleToString(ManagedBasketProfit(), 2), " ",
+              AccountInfoString(ACCOUNT_CURRENCY), "\n",
+              "Today: ", DoubleToString(todayResult, 2), " ",
+              AccountInfoString(ACCOUNT_CURRENCY));
+      return;
+   }
+
+   if(!IsNewBar() || !CooldownAllowed() || !SpreadAllowed())
+      return;
+
+   int direction = 0;
+   if(GetSignal(direction))
+      OpenFiveLayers(direction);
+}
