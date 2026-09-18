@@ -1,9 +1,9 @@
 //+------------------------------------------------------------------+
-//|                                           FastScalperCentM5.mq5  |
+//|                                        UltraFastScalperM1.mq5    |
 //|                                  Copyright 2026, Expert Advisor  |
 //+------------------------------------------------------------------+
-#property copyright "EA Fast Scalper Cent M5"
-#property version   "2.10"
+#property copyright "EA Ultra Fast Scalper M1"
+#property version   "3.00"
 
 #include <Trade\Trade.mqh>
 CTrade trade;
@@ -15,22 +15,22 @@ input double   InpDailyTarget    = 2000.0;   // Target Profit Harian (dalam Cent
 
 input group "=== Pengaturan Lot & Posisi ==="
 input double   InpLotSize        = 0.10;     // Ukuran Lot per Entry
-input int      InpMaxOrders      = 4;        // Jumlah Posisi Sekali Eksekusi
-input bool     InpAutoCutOpposite= true;     // Auto Cut jika Sinyal Berbalik Arah?
+input int      InpMaxOrders      = 4;        // Jumlah Posisi Sekali Eksekusi (4 Posisi)
+input bool     InpAutoCutOpposite= true;     // Auto Cut/Tutup Posisi Jika Sinyal Berbalik Arah?
 
-input group "=== Parameter Target (Pips) ==="
-input double   InpTakeProfitPips = 3.0;      // Take Profit (Pips)
-input double   InpStopLossPips   = 3.0;      // Initial Stop Loss (Pips)
-input double   InpMaxSpreadPips  = 1.0;      // Maksimal Spread Toleransi (Pips)
+input group "=== Parameter Target M1 (Pips) ==="
+input double   InpTakeProfitPips = 1.5;      // Take Profit (Pips M1)
+input double   InpStopLossPips   = 2.0;      // Initial Stop Loss (Pips M1)
+input double   InpMaxSpreadPips  = 0.8;      // Maksimal Spread Toleransi (Pips)
 
-input group "=== Fitur SL+ & Trailing Stop (Pips) ==="
+input group "=== Fitur SL+ & Trailing Stop M1 (Pips) ==="
 input bool     InpUseTrailing    = true;     // Aktifkan SL+ / Trailing Stop?
-input double   InpTrailingStart  = 1.0;      // Jarak Running Profit untuk Aktifkan SL+ (Pips)
-input double   InpTrailingStep   = 0.5;      // Jarak Kunci Profit / Geser SL (Pips)
+input double   InpTrailingStart  = 0.8;      // Running Profit untuk Aktifkan SL+ (Pips)
+input double   InpTrailingStep   = 0.4;      // Jarak Kunci Profit / Geser SL (Pips)
 
-input group "=== Indikator Sinyal Cepat (EMA & RSI) ==="
-input int      InpFastEMAPeriod  = 8;        // Periode Fast EMA
-input int      InpSlowEMAPeriod  = 21;       // Periode Slow EMA
+input group "=== Indikator Sinyal Ultra Cepat M1 ==="
+input int      InpFastEMAPeriod  = 5;        // Periode Fast EMA (Ultra Cepat)
+input int      InpSlowEMAPeriod  = 13;       // Periode Slow EMA
 input int      InpRSIPeriod      = 14;       // Periode RSI
 
 //--- Global Variables
@@ -52,7 +52,7 @@ int OnInit()
 
    if(fastEmaHandle == INVALID_HANDLE || slowEmaHandle == INVALID_HANDLE || rsiHandle == INVALID_HANDLE)
      {
-      Print("Gagal menginisialisasi Indikator Sinyal Cepat");
+      Print("Gagal menginisialisasi Indikator Sinyal Cepat M1");
       return(INIT_FAILED);
      }
      
@@ -75,7 +75,7 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
   {
-   // 1. Eksekusi Trailing Stop / SL+
+   // 1. Eksekusi Trailing Stop / SL+ pada setiap tick
    if(InpUseTrailing)
      {
       ApplyTrailingStop();
@@ -88,7 +88,7 @@ void OnTick()
       return; 
      }
 
-   // 3. Evaluasi Sinyal pada Candle Baru M5
+   // 3. Evaluasi Sinyal pada Candle Baru M1 (Setiap 1 Menit)
    datetime currentBarTime = iTime(_Symbol, _Period, 0);
    if(currentBarTime == lastBarTime) return;
 
@@ -114,14 +114,17 @@ void OnTick()
    double tpDistance = InpTakeProfitPips * pipsToPoint;
    double slDistance = InpStopLossPips * pipsToPoint;
 
-   // Logika Sinyal
+   // Logika Sinyal M1:
+   // BUY: Fast EMA (5) menyilang Slow EMA (13) ke Atas + RSI > 50
    bool isBuySignal  = (fastEma[1] > slowEma[1] && fastEma[2] <= slowEma[2]) && (rsi[0] > 50.0);
+   
+   // SELL: Fast EMA (5) menyilang Slow EMA (13) ke Bawah + RSI < 50
    bool isSellSignal = (fastEma[1] < slowEma[1] && fastEma[2] >= slowEma[2]) && (rsi[0] < 50.0);
 
    // Jika ada sinyal BUY baru
    if(isBuySignal)
      {
-      // Auto-Cut posisi SELL yang masih aktif jika sinyal berubah jadi BUY
+      // Cut posisi SELL jika ada sinyal BUY baru
       if(InpAutoCutOpposite) ClosePositionsByType(POSITION_TYPE_SELL);
 
       if(!HasOpenPositions())
@@ -130,7 +133,7 @@ void OnTick()
          double tp = ask + tpDistance;
          for(int i = 0; i < InpMaxOrders; i++)
            {
-            trade.Buy(InpLotSize, _Symbol, ask, sl, tp, "Fast Scalp Buy Cent");
+            trade.Buy(InpLotSize, _Symbol, ask, sl, tp, "M1 Scalp Buy Cent");
            }
          lastBarTime = currentBarTime;
         }
@@ -138,7 +141,7 @@ void OnTick()
    // Jika ada sinyal SELL baru
    else if(isSellSignal)
      {
-      // Auto-Cut posisi BUY yang masih aktif jika sinyal berubah jadi SELL
+      // Cut posisi BUY jika ada sinyal SELL baru
       if(InpAutoCutOpposite) ClosePositionsByType(POSITION_TYPE_BUY);
 
       if(!HasOpenPositions())
@@ -147,7 +150,7 @@ void OnTick()
          double tp = bid - tpDistance;
          for(int i = 0; i < InpMaxOrders; i++)
            {
-            trade.Sell(InpLotSize, _Symbol, bid, sl, tp, "Fast Scalp Sell Cent");
+            trade.Sell(InpLotSize, _Symbol, bid, sl, tp, "M1 Scalp Sell Cent");
            }
          lastBarTime = currentBarTime;
         }
@@ -168,7 +171,7 @@ bool HasOpenPositions()
   }
 
 //+------------------------------------------------------------------+
-//| Fungsi Auto-Cut Posisi Berdasarkan Tipe (BUY/SELL)              |
+//| Fungsi Auto-Cut Posisi Berdasarkan Tipe                         |
 //+------------------------------------------------------------------+
 void ClosePositionsByType(ENUM_POSITION_TYPE posType)
   {
@@ -208,7 +211,7 @@ double GetTodayProfit()
   }
 
 //+------------------------------------------------------------------+
-//| Fungsi Menggeser SL+ / Trailing Stop                             |
+//| Fungsi Menggeser SL+ / Trailing Stop M1                          |
 //+------------------------------------------------------------------+
 void ApplyTrailingStop()
   {
