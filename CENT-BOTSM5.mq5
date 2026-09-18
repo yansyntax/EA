@@ -4,7 +4,6 @@
 //+------------------------------------------------------------------+
 #property copyright "EA Fast Scalper Cent M5"
 #property version   "2.10"
-#property strict
 
 #include <Trade\Trade.mqh>
 CTrade trade;
@@ -17,7 +16,7 @@ input double   InpDailyTarget    = 2000.0;   // Target Profit Harian (dalam Cent
 input group "=== Pengaturan Lot & Posisi ==="
 input double   InpLotSize        = 0.10;     // Ukuran Lot per Entry
 input int      InpMaxOrders      = 4;        // Jumlah Posisi Sekali Eksekusi
-input bool     InpAutoCutOpposite= true;     // Auto Cut/Tutup Posisi jika Sinyal Berbalik Arah?
+input bool     InpAutoCutOpposite= true;     // Auto Cut jika Sinyal Berbalik Arah?
 
 input group "=== Parameter Target (Pips) ==="
 input double   InpTakeProfitPips = 3.0;      // Take Profit (Pips)
@@ -171,7 +170,7 @@ bool HasOpenPositions()
 //+------------------------------------------------------------------+
 //| Fungsi Auto-Cut Posisi Berdasarkan Tipe (BUY/SELL)              |
 //+------------------------------------------------------------------+
-void ClosePositionsByType(enum_position_type posType)
+void ClosePositionsByType(ENUM_POSITION_TYPE posType)
   {
    for(int i = PositionsTotal() - 1; i >= 0; i--)
      {
