@@ -1,8 +1,8 @@
 //+------------------------------------------------------------------+
-//|                                               EA_SMC_XAUUSD.mq5  |
+//|                                                   ANJAI.mq5.mq5  |
 //|                          Advanced Price Action, FVG, OB, & HTF   |
 //+------------------------------------------------------------------+
-#property copyright "Gemini AI - Institutional Logic"
+#property copyright "Yanbhoikfost - Institutional Logic"
 #property version   "2.01"
 
 #include <Trade\Trade.mqh>
