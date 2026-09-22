@@ -1,9 +1,9 @@
 //+------------------------------------------------------------------+
-//|                                           SMC_ICT_Pro_EA_V2.mq5  |
+//|                                               EA_SMC_XAUUSD.mq5  |
 //|                          Advanced Price Action, FVG, OB, & HTF   |
 //+------------------------------------------------------------------+
 #property copyright "Gemini AI - Institutional Logic"
-#property version   "2.00"
+#property version   "2.01"
 
 #include <Trade\Trade.mqh>
 CTrade trade;
@@ -21,9 +21,9 @@ input int      LondonEnd            = 12;
 input int      NYStart              = 13;
 input int      NYEnd                = 18;
 
-//--- Setup Parameters
-input int      HTF_Period           = PERIOD_H1; // Higher Timeframe Bias
-input int      LTF_Period           = PERIOD_M5; // Lower Timeframe Entry
+//--- Setup Parameters (PERBAIKAN ERROR: Menggunakan ENUM_TIMEFRAMES)
+input ENUM_TIMEFRAMES HTF_Period    = PERIOD_H1; // Higher Timeframe Bias
+input ENUM_TIMEFRAMES LTF_Period    = PERIOD_M5; // Lower Timeframe Entry
 
 int handle_ema200_HTF;
 
@@ -89,9 +89,6 @@ void OnTick()
    
    double high1 = iHigh(_Symbol, LTF_Period, 1);
    double low1  = iLow(_Symbol, LTF_Period, 1);
-   
-   double high2 = iHigh(_Symbol, LTF_Period, 2);
-   double low2  = iLow(_Symbol, LTF_Period, 2);
    
    double high3 = iHigh(_Symbol, LTF_Period, 3);
    double low3  = iLow(_Symbol, LTF_Period, 3);
@@ -164,7 +161,10 @@ void ManagePendingOrders()
         {
          // Logika ICT: Jika limit order ditinggalkan dan market sudah bergerak terlalu jauh (Invalidation)
          // Di sini kita simplifikasi: Hapus order jika dibiarkan > 20 candle tanpa ter-trigger
-         datetime setup_time = OrderGetInteger(ORDER_TIME_SETUP);
+         
+         // PERBAIKAN WARNING: Casting tipe data ke datetime
+         datetime setup_time = (datetime)OrderGetInteger(ORDER_TIME_SETUP);
+         
          if(TimeCurrent() - setup_time > (20 * PeriodSeconds(LTF_Period)))
            {
             trade.OrderDelete(ticket);
@@ -173,3 +173,4 @@ void ManagePendingOrders()
         }
      }
   }
+//+------------------------------------------------------------------+
